@@ -110,9 +110,11 @@ export class Clock {
 
     let nt = this.t + dt;
 
-    // Adım-adım: faz sınırında duraklat
+    // Adım-adım: faz sınırında duraklat. Sınırdan hemen ÖNCE dur ki zaman hâlâ
+    // biten fazın içinde kalsın (aksi halde sınır bir sonraki fazın t0'ıdır ve
+    // "sonraki adım" bir adımı atlar).
     if (nt >= this.nextStepStop) {
-      this.t = this.nextStepStop;
+      this.t = Math.max(0, this.nextStepStop - 4);
       this.onFrame(this.t);
       this.pause();
       return;

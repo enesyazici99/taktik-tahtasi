@@ -56,30 +56,35 @@ app.appendChild(phasePanel.el);
 // --- Kontroller (adım-merkezli) ---
 const controls = createControls(stage.clock, {
   onPlayPause: playPause,
-  onPrevStep: () => goToStep(currentIndex() - 1),
-  onNextStep: () => {
-    const i = currentIndex();
-    goToStep(i >= currentScenario.phases.length - 1 ? 0 : i + 1);
-  },
+  onPrevStep: () => goToStep(stepIndex - 1),
+  onNextStep: () =>
+    goToStep(stepIndex >= currentScenario.phases.length - 1 ? 0 : stepIndex + 1),
   onWatchAll: watchAll,
 });
 app.appendChild(controls.el);
 
 let currentScenario: CompiledScenario = firstScenario();
 let loadedId = '';
+let stepIndex = 0; // gösterilen/aktif adım (gerçek durum — sınır belirsizliğini önler)
 
 // --- Araçlar: yardım + video ---
 mountTools({ helpBtn, videoBtn, stage, getCurrent: () => currentScenario });
 
 // --- Render bağlantısı ---
 stage.onRender = (frame, sc) => {
-  phasePanel.setActive(frame.phaseIndex);
   controls.update(frame.t);
-  controls.setStep(frame.phaseIndex, sc.phases.length);
-  const ph = sc.phases[frame.phaseIndex];
-  badge.textContent = ph ? `${frame.phaseIndex + 1}/${sc.phases.length} · ${ph.title}` : '';
+  // Saat sınırdan ÖNCE durduğu için frame.phaseIndex her zaman aktif adımı verir.
+  stepIndex = frame.phaseIndex;
+  syncStepUI(sc);
 };
 stage.clock.onStateChange = (s) => controls.setPlaying(s.playing);
+
+function syncStepUI(sc: CompiledScenario): void {
+  phasePanel.setActive(stepIndex);
+  controls.setStep(stepIndex, sc.phases.length);
+  const ph = sc.phases[stepIndex];
+  badge.textContent = ph ? `${stepIndex + 1}/${sc.phases.length} · ${ph.title}` : '';
+}
 
 function selectScenario(sc: CompiledScenario, updateHash: boolean): void {
   currentScenario = sc;
@@ -92,23 +97,16 @@ function selectScenario(sc: CompiledScenario, updateHash: boolean): void {
 }
 
 // --- Adım gezinme ---
-function currentIndex(): number {
-  const t = stage.clock.getTime();
-  const phases = currentScenario.phases;
-  let idx = 0;
-  for (let i = 0; i < phases.length; i++) if (t >= phases[i].t0 - 1) idx = i;
-  return idx;
-}
-
 function phaseIndexOf(t0: number): number {
   return Math.max(0, currentScenario.phases.findIndex((p) => Math.abs(p.t0 - t0) < 1));
 }
 
 function goToStep(index: number, autoplay = true): void {
   const phases = currentScenario.phases;
-  const i = Math.max(0, Math.min(phases.length - 1, index));
+  stepIndex = Math.max(0, Math.min(phases.length - 1, index));
   stage.clock.setStepMode(true);
-  stage.clock.seek(phases[i].t0);
+  stage.clock.seek(phases[stepIndex].t0); // adımın BAŞINA → play ile hareket görünür
+  syncStepUI(currentScenario);
   if (autoplay && !reduced) stage.clock.play();
 }
 
@@ -117,14 +115,16 @@ function playPause(): void {
     stage.clock.pause();
     return;
   }
-  const ph = currentScenario.phases[currentIndex()];
-  // Adım sonundaysak o adımı baştan tekrar oynat
-  if (ph && stage.clock.getTime() >= ph.t1 - 30) stage.clock.seek(ph.t0);
+  const ph = currentScenario.phases[stepIndex];
+  // Adım sonundaysak (ya da dışındaysak) o adımı baştan tekrar oynat
+  const t = stage.clock.getTime();
+  if (ph && (t >= ph.t1 - 30 || t < ph.t0)) stage.clock.seek(ph.t0);
   stage.clock.setStepMode(true);
   stage.clock.play();
 }
 
 function watchAll(): void {
+  stepIndex = 0;
   stage.clock.setStepMode(false);
   stage.clock.seek(0);
   if (!reduced) stage.clock.play();
@@ -152,10 +152,10 @@ window.addEventListener('keydown', (e) => {
       playPause();
       break;
     case 'ArrowRight':
-      goToStep(currentIndex() + 1);
+      goToStep(stepIndex + 1);
       break;
     case 'ArrowLeft':
-      goToStep(currentIndex() - 1);
+      goToStep(stepIndex - 1);
       break;
     case 'r':
     case 'R':

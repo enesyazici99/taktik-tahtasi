@@ -24,6 +24,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+button,
+.chip,
+.group-tab,
+.phase-pill,
+input[type='range'] {
+  touch-action: manipulation;
+}
+
 html,
 body {
   margin: 0;
@@ -107,6 +115,24 @@ button {
 }
 .icon-btn:active {
   transform: scale(0.94);
+}
+
+/* Yatay kaydırılan seçim/adım şeritleri: mobilde momentum + kenar solması
+   (daha fazla içerik olduğunu belli eder, "kayboldu" hissi olmaz). */
+.group-tabs,
+.scenario-chips,
+.phase-strip {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  scroll-snap-type: x proximity;
+  scroll-padding-left: 12px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 8px, #000 calc(100% - 22px), transparent 100%);
+}
+.group-tab,
+.chip,
+.phase-pill {
+  scroll-snap-align: start;
 }
 
 .group-tabs {

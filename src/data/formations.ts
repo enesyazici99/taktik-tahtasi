@@ -95,10 +95,42 @@ export const FPRESS: Formation = {
   positions: { ...US_PRESS, ...THEM_BUILDUP },
 };
 
+// --- Presten çıkış: BİZ arkadan kurarız, rakip yüksek ve BİREBİR presler ---
+// Bizim kale altta; rakip forvet/kanatları stoperlerimize adam adam basar.
+const US_BUILD: Record<string, Vec> = {
+  uK: { x: 0.5, y: 0.93 },
+  u4: { x: 0.26, y: 0.8 },
+  u5: { x: 0.5, y: 0.85 },
+  u3: { x: 0.74, y: 0.8 },
+  u6: { x: 0.5, y: 0.66 },
+  u8: { x: 0.64, y: 0.6 },
+  u11: { x: 0.18, y: 0.54 },
+  u7: { x: 0.82, y: 0.54 },
+  u9: { x: 0.5, y: 0.42 },
+};
+
+const THEM_HIGHPRESS: Record<string, Vec> = {
+  rK: { x: 0.5, y: 0.06 },
+  r6: { x: 0.5, y: 0.4 }, // arkayı kapatır (bizim 9'u tutar)
+  r2: { x: 0.28, y: 0.56 }, // bizim 11'i markа
+  r5: { x: 0.72, y: 0.56 }, // bizim 7'yi marka
+  r10: { x: 0.5, y: 0.62 }, // bizim 6'ya (pivot) basar
+  r7: { x: 0.3, y: 0.74 }, // bizim 4'e (sol stoper) birebir
+  r11: { x: 0.7, y: 0.74 }, // bizim 3'e (sağ stoper) birebir
+  r9: { x: 0.5, y: 0.78 }, // kaleci/libero hattına basan santrafor
+};
+
+export const FBUILD: Formation = {
+  id: 'FBUILD',
+  name: 'Presten Çıkış (rakip birebir pres)',
+  positions: { ...US_BUILD, ...THEM_HIGHPRESS },
+};
+
 export const FORMATIONS: Record<string, Formation> = {
   F323,
   F341,
   FPRESS,
+  FBUILD,
 };
 
 // --- v2 dizilim varyantları (bizim şeklimiz) — editör/analiz modu için ---
