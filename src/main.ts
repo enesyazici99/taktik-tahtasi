@@ -1,55 +1,120 @@
 import './styles.css';
 import { Stage } from './stage';
-import { firstScenario } from './scenarios';
+import { firstScenario, SCENARIO_BY_ID } from './scenarios';
+import { createScenarioList } from './ui/scenarioList';
+import { createPhasePanel } from './ui/phasePanel';
+import { createControls } from './ui/controls';
+import { mountTools } from './ui/tools';
+import type { CompiledScenario } from './types';
 
 // ============================================================================
-// Faz 2 dev harness — derlenmiş C1 senaryosu + scrubber. (Faz 4'te tam UI.)
+// Uygulama bağlama: senaryo seçici + saha + faz paneli + kontroller.
+// Hash router, klavye kısayolları, reduced-motion.
 // ============================================================================
 
 const app = document.getElementById('app')!;
+const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// --- Üst bar ---
 const topbar = document.createElement('div');
 topbar.className = 'topbar';
-const sc = firstScenario();
-topbar.innerHTML = `<div class="brand"><h1>Taktik Tahtası</h1><span class="sub">${sc.title}</span></div>`;
+const brand = document.createElement('div');
+brand.className = 'brand';
+brand.innerHTML = `<h1>Taktik Tahtası</h1><span class="sub">3-2-3</span><span class="spacer"></span>`;
+const toolsBtn = document.createElement('button');
+toolsBtn.className = 'icon-btn';
+toolsBtn.title = 'Araçlar';
+toolsBtn.textContent = '⋯';
+brand.appendChild(toolsBtn);
+topbar.appendChild(brand);
+
+const scenarioList = createScenarioList((sc) => selectScenario(sc, true));
+topbar.appendChild(scenarioList.el);
 app.appendChild(topbar);
 
+// --- Saha ---
 const pitchWrap = document.createElement('div');
 pitchWrap.className = 'pitch-wrap';
 app.appendChild(pitchWrap);
-
 const stage = new Stage(pitchWrap);
-stage.load(sc);
 
-const dev = document.createElement('div');
-dev.className = 'dev-bar';
-dev.innerHTML = `
-  <div class="control-row">
-    <button class="ctrl primary" id="play">▶</button>
-    <button class="ctrl" id="restart">⟲</button>
-    <input type="range" id="scrub" min="0" max="${Math.round(sc.duration)}" value="0" style="flex:1" />
-    <span class="time-read" id="tread">0.00s</span>
-  </div>
-`;
-app.appendChild(dev);
+// --- Faz paneli ---
+const phasePanel = createPhasePanel((phase) => {
+  stage.clock.seek(phase.t0);
+});
+app.appendChild(phasePanel.el);
 
-const playBtn = dev.querySelector<HTMLButtonElement>('#play')!;
-const scrub = dev.querySelector<HTMLInputElement>('#scrub')!;
-const tread = dev.querySelector<HTMLSpanElement>('#tread')!;
+// --- Kontroller ---
+const controls = createControls(stage.clock);
+app.appendChild(controls.el);
 
-playBtn.onclick = () => stage.clock.toggle();
-dev.querySelector<HTMLButtonElement>('#restart')!.onclick = () => stage.clock.restart();
-scrub.oninput = () => {
-  stage.clock.pause();
-  stage.clock.seek(Number(scrub.value));
+let currentScenario: CompiledScenario = firstScenario();
+
+// --- Bağlantılar ---
+stage.onRender = (frame) => {
+  phasePanel.setActive(frame.phaseIndex);
+  controls.update(frame.t);
 };
+stage.clock.onStateChange = (s) => controls.setPlaying(s.playing);
 
-stage.clock.onStateChange = (s) => {
-  playBtn.textContent = s.playing ? '⏸' : '▶';
-};
-stage.onRender = (frame, s) => {
-  scrub.value = String(Math.round(frame.t));
-  const ph = s.phases[frame.phaseIndex];
-  tread.textContent = `${(frame.t / 1000).toFixed(1)}s · ${ph?.title ?? ''}`;
-};
+function selectScenario(sc: CompiledScenario, updateHash: boolean): void {
+  currentScenario = sc;
+  stage.load(sc);
+  phasePanel.setScenario(sc);
+  controls.setScenario(sc);
+  brand.querySelector('.sub')!.textContent = sc.title;
+  if (updateHash) location.hash = `/senaryo/${sc.id}`;
+  if (!reduced) stage.clock.play();
+}
 
-console.log('Faz 2: C1 derlendi ve yüklendi.');
+// --- Araçlar (v2: editör, export, varyant, ses, analiz) ---
+mountTools(toolsBtn, stage, () => currentScenario, (sc) => selectScenario(sc, true));
+
+// --- Hash router ---
+function routeFromHash(): void {
+  const m = location.hash.match(/senaryo\/([\w-]+)/);
+  if (m && SCENARIO_BY_ID[m[1]]) {
+    scenarioList.select(m[1]);
+  } else {
+    selectScenario(firstScenario(), true);
+    scenarioList.select(firstScenario().id);
+  }
+}
+window.addEventListener('hashchange', routeFromHash);
+
+// --- Klavye kısayolları ---
+window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return;
+  switch (e.key) {
+    case ' ':
+      e.preventDefault();
+      stage.clock.toggle();
+      break;
+    case 'ArrowRight':
+      seekPhase(1);
+      break;
+    case 'ArrowLeft':
+      seekPhase(-1);
+      break;
+    case 'r':
+    case 'R':
+      stage.clock.restart();
+      break;
+  }
+});
+
+function seekPhase(dir: number): void {
+  const t = stage.clock.getTime();
+  const phases = currentScenario.phases;
+  let idx = 0;
+  for (let i = 0; i < phases.length; i++) if (t >= phases[i].t0 - 1) idx = i;
+  const next = Math.max(0, Math.min(phases.length - 1, idx + dir));
+  stage.clock.seek(phases[next].t0);
+}
+
+// Başlat
+routeFromHash();
+
+if (reduced) {
+  stage.clock.seek(0);
+}
