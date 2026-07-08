@@ -52,14 +52,17 @@ Derleyici süreleri mesafeden hesaplar, doğrulama yapar (ışınlanma, sahipsiz
 dışı) ve `CompiledScenario` üretir. Aksiyonlar: `hold, run, pass, longPass, dribble,
 shoot, clear, press, seq, par, wait`.
 
-## Kontroller
+## Kullanım (adım-adım)
 
-Oynat/durdur (space), yeniden başlat, hız (0.5/1/1.5x), timeline scrubber (faz tick'leri),
-faza tıkla=seek, ←/→ ile faz atla, adım-adım modu. URL hash ile senaryo linki
-(`#/senaryo/c1-ucuncu-adam`) — WhatsApp'tan takıma atılabilir.
+Uygulama adım-merkezlidir: her senaryo adım adım oynar, adım bitince **otomatik durur**
+ki direktif okunabilsin. **"Sonraki adım ▶"** ile ilerlenir, **"◀"** ile geri dönülür,
+**"⟲ Baştan izle"** ile senaryonun tamamı kesintisiz oynatılır.
 
-## v2 özellikleri
-
-Senaryo editörü (drag&drop + JSON export/import), video export (WebM/GIF), dizilim
-varyantları (2-4-2, 3-3-2), sesli anlatım, rakip analiz modu. `?` ile veya üst bardaki
-menüden açılır.
+- Aktif adımın **koçluk notu** altta büyük ve okunur şekilde durur; sahada adım rozeti görünür.
+- Varsayılan hız **0.75×** (yavaş, okunaklı); 0.5 / 0.75 / 1 seçilebilir.
+- Klavye: `Space` oynat/durdur, `←/→` adım geç, `R` baştan.
+- **?** düğmesi "Nasıl kullanılır?" yardımını açar (ilk açılışta otomatik gösterilir).
+- **⬇** düğmesi senaryoyu **video (WebM)** olarak indirir — her karede adım başlığı +
+  direktif gömülüdür, WhatsApp'tan takıma atılabilir.
+- URL hash ile paylaşım: `#/senaryo/c1-ucuncu-adam` bir senaryoyu, `&t=2000` eklemek
+  belirli bir anı açar.

@@ -58,7 +58,7 @@ export function createPhasePanel(onSeek: (phase: Phase) => void): PhasePanel {
     if (!ph) return;
     card.classList.add('fading');
     window.setTimeout(() => {
-      title.textContent = ph.title;
+      title.textContent = `ADIM ${index + 1}/${phases.length} · ${ph.title}`;
       text.textContent = ph.note;
       card.classList.remove('fading');
     }, TIMING.noteFade);

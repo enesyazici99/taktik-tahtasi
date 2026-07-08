@@ -3,7 +3,7 @@
 // sürer ama zaman DURUMU sadece burada; render(t) tamamen saf kalır.
 // ============================================================================
 
-export type Speed = 0.5 | 1 | 1.5;
+export type Speed = number; // 0.5 / 0.75 / 1 ...
 
 export interface ClockState {
   t: number; // senaryo içi zaman (ms)
@@ -14,10 +14,10 @@ export interface ClockState {
 export class Clock {
   private t = 0;
   private playing = false;
-  private speed: Speed = 1;
+  private speed: Speed = 0.75; // varsayılan yavaş — okunaklı tempo
   private duration = 1;
   private loop = true;
-  private stepMode = false; // adım-adım: faz sonlarında duraklat
+  private stepMode = true; // adım-adım varsayılan açık: her adım sonunda dur
   private lastRaf = 0;
   private rafId = 0;
   private phaseEnds: number[] = []; // adım-adım için faz sınırları

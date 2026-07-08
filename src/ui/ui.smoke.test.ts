@@ -23,9 +23,15 @@ describe('UI bileşenleri (jsdom)', () => {
     const sc = firstScenario();
 
     let selected = '';
+    let nextCount = 0;
     const list = createScenarioList((s) => (selected = s.id));
     const panel = createPhasePanel((p) => stage.clock.seek(p.t0));
-    const controls = createControls(stage.clock);
+    const controls = createControls(stage.clock, {
+      onPlayPause: () => stage.clock.toggle(),
+      onPrevStep: () => {},
+      onNextStep: () => nextCount++,
+      onWatchAll: () => stage.clock.setStepMode(false),
+    });
     mount.append(list.el, panel.el, controls.el);
 
     stage.load(sc);
@@ -45,10 +51,18 @@ describe('UI bileşenleri (jsdom)', () => {
     // Faz pill'ine tıkla → seek (hata fırlatmamalı)
     expect(() => (mount.querySelectorAll('.phase-pill')[1] as HTMLButtonElement)?.click()).not.toThrow();
 
-    // Oynat/durdur butonu
-    const play = controls.el.querySelector('.ctrl.primary') as HTMLButtonElement;
+    // Oynat/durdur (adım play butonu)
+    const play = controls.el.querySelector('.stepbtn.play') as HTMLButtonElement;
     expect(() => play.click()).not.toThrow();
     stage.clock.pause();
+
+    // Sonraki adım butonu
+    (controls.el.querySelector('.stepbtn.next') as HTMLButtonElement).click();
+    expect(nextCount).toBe(1);
+
+    // setStep son adımda "Baştan" etiketi verir
+    controls.setStep(sc.phases.length - 1, sc.phases.length);
+    expect((controls.el.querySelector('.stepbtn.next') as HTMLElement).textContent).toContain('Baştan');
 
     // Render bir kare
     expect(() => stage.render(sc.duration * 0.5)).not.toThrow();
