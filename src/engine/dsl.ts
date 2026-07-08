@@ -89,3 +89,24 @@ export function defaultBehaviors(extra: Record<string, Behavior[]> = {}): Record
 }
 
 export const DEFAULT_BEHAVIORS = defaultBehaviors();
+
+// Savunma bloğu: hatlar topla beraber kayar (blockShift), 5 → r9 gölgeler,
+// 9 topu kovalayan pres kavisi. Savunma/pres senaryolarının bel kemiği.
+export function defenseBlock(extra: Record<string, Behavior[]> = {}): Record<string, Behavior[]> {
+  const line: Behavior[] = [{ kind: 'blockShift', fx: 0.2, fy: 0.06 }];
+  const mid: Behavior[] = [{ kind: 'blockShift', fx: 0.34, fy: 0.08 }];
+  return {
+    u4: line,
+    u3: line,
+    u6: mid,
+    u8: mid,
+    u11: [{ kind: 'blockShift', fx: 0.42, fy: 0.06 }],
+    u7: [{ kind: 'blockShift', fx: 0.42, fy: 0.06 }],
+    u5: [
+      { kind: 'blockShift', fx: 0.2, fy: 0.06 },
+      { kind: 'shadowMark', targetId: 'r9', offset: { x: 0.0, y: 0.05 } },
+    ],
+    u9: [{ kind: 'chaseBall', fx: 1, minY: 0.32 }],
+    ...extra,
+  };
+}
