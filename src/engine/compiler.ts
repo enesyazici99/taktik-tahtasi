@@ -12,6 +12,7 @@ import type {
 import type { ActionNode, ScenarioDef } from './dsl';
 import { DEFAULT_BEHAVIORS } from './dsl';
 import { dist, sampleTrack } from './interpolate';
+import { resolveFrame } from './resolve';
 
 // ============================================================================
 // Derleyici: DSL aksiyonları → CompiledScenario.
@@ -75,10 +76,16 @@ function addKf(ctx: Ctx, id: string, t: number, pos: Vec, ease?: Keyframe['ease'
   arr.sort((a, b) => a.t - b.t);
 }
 
-/** Entity hareketten önce başlangıç noktasında sabitlensin (anchor). */
+/**
+ * Entity başlangıç noktasında sabitlensin (anchor). Ama entity o an zaten
+ * hareket halindeyse (ileride keyframe'i var) araya keyframe SOKMA — mevcut
+ * eased segmenti bölmek hız profilini bozar (ışınlanma). Sadece pozu oku.
+ */
 function anchor(ctx: Ctx, id: string, t: number): Vec {
   const p = posAt(ctx, id, t);
-  addKf(ctx, id, t, p);
+  const arr = ctx.kf.get(id);
+  const hasLater = arr && arr.some((k) => k.t > t + 0.5);
+  if (!hasLater) addKf(ctx, id, t, p);
   return p;
 }
 
@@ -154,12 +161,14 @@ function compileAction(ctx: Ctx, a: ActionNode, start: number): number {
       if (!inPitch(target)) throw new CompileError(id, `${a.op} ${a.from}→${a.to}`, `hedef saha dışı: ${fmt(target)}`);
       ctx.flights.push({ t0: start, t1: arrival, from, to: target, arc, fromId: a.from, toId: a.to });
       ctx.annotations.push({ kind: 'passLine', t0: start, t1: arrival, from, to: target });
-      // Alıcıyı topun varış noktasında sabitle (yoksa davranış çeker)
-      if (!ctx.kf.has(a.to)) anchor(ctx, a.to, start);
-      addKf(ctx, a.to, arrival, target);
-      if (a.opts.oneTouch) {
-        // Alıcı 120ms sonra tekrar hareket edebilir; burada sadece kısa hold
-        addKf(ctx, a.to, arrival + TIMING.oneTouch, target);
+      // Alıcı varış anında zaten hareket halindeyse kendi track'i topu karşılar
+      // (ekstra keyframe koşuyu bozar → ışınlanma). Sadece sabit alıcıyı sabitle.
+      const rkf = ctx.kf.get(a.to);
+      const recvMoving = !!rkf && rkf.length > 0 && rkf[rkf.length - 1].t >= arrival - 1;
+      if (!recvMoving) {
+        if (!ctx.kf.has(a.to)) anchor(ctx, a.to, start);
+        addKf(ctx, a.to, arrival, target);
+        if (a.opts.oneTouch) addKf(ctx, a.to, arrival + TIMING.oneTouch, target);
       }
       return arrival;
     }
@@ -168,7 +177,9 @@ function compileAction(ctx: Ctx, a: ActionNode, start: number): number {
       const from = anchor(ctx, a.from, start);
       if (!inPitch(a.target)) throw new CompileError(id, `shoot ${a.from}`, `hedef saha dışı: ${fmt(a.target)}`);
       const arrival = start + (dist(from, a.target) / SPEEDS.shot) * 1000;
-      ctx.flights.push({ t0: start, t1: arrival, from, to: a.target, arc: 0.3, fromId: a.from, toId: null });
+      // Top kalecide toplanır → şuttan sonra sahipsiz kalmaz (başka koşular sürebilir)
+      const keeper = a.target.y < 0.5 ? 'rK' : 'uK';
+      ctx.flights.push({ t0: start, t1: arrival, from, to: a.target, arc: 0.3, fromId: a.from, toId: keeper });
       ctx.annotations.push({ kind: 'passLine', t0: start, t1: arrival, from, to: a.target });
       return arrival;
     }
@@ -283,18 +294,29 @@ export function compileScenario(def: ScenarioDef): CompiledScenario {
   // İlk taşıyıcı
   const initialCarrier = resolveInitialCarrier(ctx, def);
 
-  // --- Reset koşusu: yer değiştiren herkes formasyona döner (ışınlanmasız) ---
-  // Reset penceresi en uzak dönüşe göre ölçeklenir → kimse sprint üstüne çıkmaz.
-  const displaced: { id: string; lastPos: Vec; lastT: number; home: Vec }[] = [];
+  // --- Top: reset ÖNCESİ segmentler (carried dolgular + flight'lar) ---
+  const core = synthesizeCarried(ctx, def, initialCarrier, actionsEnd);
+
+  // Reset hedefleri, oyuncunun t=0'daki GÖRÜNEN pozudur (davranış dahil) —
+  // formasyon değil. Böylece loop dikişi (t=duration→t=0) kusursuz kapanır.
+  const prelim: CompiledScenario = {
+    id: def.id, title: def.title, group: def.group, duration: actionsEnd + TIMING.resetRun,
+    formation: def.formation, players: [], tracks: tracksFrom(ctx),
+    behaviors: def.behaviors ?? DEFAULT_BEHAVIORS, ball: core.segments, annotations: [], phases,
+  };
+  const frame0 = resolveFrame(prelim, 0);
+
+  // Yer değiştiren tracklı oyuncular → t=0 pozuna dön. Pencere en uzak dönüşe göre.
+  const displaced: { id: string; lastPos: Vec; lastT: number; target: Vec }[] = [];
   let maxResetDist = 0;
   for (const [id, kf] of ctx.kf) {
     if (!kf.length) continue;
     const last = kf[kf.length - 1];
-    const home = def.formation.positions[id];
-    if (!home) continue;
-    const d = dist(last.pos, home);
+    const target = frame0.entities[id] ? { x: frame0.entities[id].x, y: frame0.entities[id].y } : def.formation.positions[id];
+    if (!target) continue;
+    const d = dist(last.pos, target);
     if (d > 0.005) {
-      displaced.push({ id, lastPos: last.pos, lastT: last.t, home });
+      displaced.push({ id, lastPos: last.pos, lastT: last.t, target });
       maxResetDist = Math.max(maxResetDist, d);
     }
   }
@@ -302,17 +324,16 @@ export function compileScenario(def: ScenarioDef): CompiledScenario {
   const duration = actionsEnd + resetDur;
   for (const d of displaced) {
     if (d.lastT < actionsEnd) addKf(ctx, d.id, actionsEnd, d.lastPos);
-    addKf(ctx, d.id, duration, d.home, 'decel');
+    addKf(ctx, d.id, duration, d.target, 'decel');
   }
 
-  // --- Top segmentleri: flight'lar + carried dolgular + reset top uçuşu ---
-  const ball = synthesizeBall(ctx, def, initialCarrier, actionsEnd, duration);
+  // Top reset uçuşu: t=0'daki top pozuna geri getir (dikiş kapanır)
+  const ball = core.segments;
+  const ballFrom = core.endCarrier != null ? posAt(ctx, core.endCarrier, core.endTime) : core.endPos;
+  ball.push({ kind: 'flight', t0: core.endTime, t1: duration, from: ballFrom, to: frame0.ball.pos, arc: 0.15 });
 
   // --- Track'leri üret ---
-  const tracks: EntityTrack[] = [];
-  for (const [id, keyframes] of ctx.kf) {
-    if (keyframes.length) tracks.push({ id, keyframes });
-  }
+  const tracks = tracksFrom(ctx);
 
   // --- Doğrulama ---
   validate(def, tracks, ball);
@@ -350,17 +371,33 @@ function resolveInitialCarrier(ctx: Ctx, def: ScenarioDef): string {
   return 'uK';
 }
 
-function synthesizeBall(
+function tracksFrom(ctx: Ctx): EntityTrack[] {
+  const tracks: EntityTrack[] = [];
+  for (const [id, keyframes] of ctx.kf) {
+    if (keyframes.length) tracks.push({ id, keyframes: keyframes.slice() });
+  }
+  return tracks;
+}
+
+interface BallCore {
+  segments: BallSegment[];
+  endTime: number;
+  endCarrier: string | null;
+  endPos: Vec;
+}
+
+/** Reset öncesi top segmentleri: flight'lar + aralara carried dolgular. */
+function synthesizeCarried(
   ctx: Ctx,
   def: ScenarioDef,
   initialCarrier: string,
   actionsEnd: number,
-  duration: number,
-): BallSegment[] {
+): BallCore {
   const flights = ctx.flights.slice().sort((a, b) => a.t0 - b.t0);
   const out: BallSegment[] = [];
   let prevEnd = 0;
   let carrier: string | null = initialCarrier;
+  let endPos: Vec = def.formation.positions[initialCarrier] ?? { x: 0.5, y: 0.9 };
 
   for (const f of flights) {
     if (f.t0 > prevEnd + 0.5) {
@@ -372,20 +409,16 @@ function synthesizeBall(
     out.push({ kind: 'flight', t0: f.t0, t1: f.t1, from: f.from, to: f.to, arc: f.arc });
     prevEnd = f.t1;
     carrier = f.toId;
+    endPos = f.to;
   }
 
-  // Son flight'tan sonra: reset top uçuşu — topu başlangıç konumuna geri getir
-  const homePos = def.formation.positions[initialCarrier] ?? { x: 0.5, y: 0.9 };
-  const ballPosAtEnd = prevEnd > 0 && flights.length ? flights[flights.length - 1].to : homePos;
+  // Son flight'tan sonra hâlâ taşınıyorsa actionsEnd'e kadar carried
   if (carrier != null && prevEnd < actionsEnd - 0.5) {
-    // Hâlâ taşınıyor: actionsEnd'e kadar carried, sonra reset uçuşu
     out.push({ kind: 'carried', t0: prevEnd, t1: actionsEnd, carrierId: carrier });
     prevEnd = actionsEnd;
   }
-  const from = carrier != null ? posAt(ctx, carrier, prevEnd) : ballPosAtEnd;
-  out.push({ kind: 'flight', t0: prevEnd, t1: duration, from, to: homePos, arc: 0.15 });
 
-  return out;
+  return { segments: out, endTime: prevEnd, endCarrier: carrier, endPos };
 }
 
 function validate(def: ScenarioDef, tracks: EntityTrack[], ball: BallSegment[]): void {
