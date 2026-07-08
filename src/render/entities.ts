@@ -104,13 +104,17 @@ export function createEntities(
   return { players: nodes, ballG, ballCore, ballShadow, trail };
 }
 
-/** Bir oyuncuyu verilen normalize konuma yerleştirir (facing radyan, opsiyonel). */
-export function placePlayer(node: PlayerNode, pos: Vec, facing = 0): void {
+/** Bir oyuncuyu verilen normalize konuma yerleştirir. facing NaN → ok gizli. */
+export function placePlayer(node: PlayerNode, pos: Vec, facing = NaN): void {
   const p = toPx(pos);
   node.g.setAttribute('transform', `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`);
   const face = node.g.querySelector('.facing') as SVGPathElement | null;
   if (face) {
-    face.setAttribute('opacity', '0.55');
-    face.setAttribute('transform', `rotate(${((facing * 180) / Math.PI).toFixed(1)})`);
+    if (Number.isNaN(facing)) {
+      face.setAttribute('opacity', '0');
+    } else {
+      face.setAttribute('opacity', '0.5');
+      face.setAttribute('transform', `rotate(${((facing * 180) / Math.PI).toFixed(1)})`);
+    }
   }
 }

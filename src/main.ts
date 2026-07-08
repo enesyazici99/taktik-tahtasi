@@ -1,65 +1,98 @@
 import './styles.css';
-import { DESIGN } from './data/constants';
-import { F323 } from './data/formations';
-import { ALL_PLAYERS } from './data/roster';
-import { createEntities, placePlayer } from './render/entities';
-import { drawPitch } from './render/pitch';
-import { el, group } from './render/svg';
+import { Stage } from './stage';
+import type { CompiledScenario } from './types';
 
 // ============================================================================
-// Faz 0 bootstrap — statik saha + F323 diziliminde 17 oyuncu.
-// (Sonraki fazlarda motor, UI ve senaryolar buraya bağlanacak.)
+// Faz 1 dev harness — motor çekirdeğini görsel doğrula. Test track A→B→A,
+// scrubber + oynat/durdur. (Faz 2/4'te gerçek DSL + UI ile değişecek.)
 // ============================================================================
 
 const app = document.getElementById('app')!;
-
-// --- Üst bar ---
 const topbar = document.createElement('div');
 topbar.className = 'topbar';
-topbar.innerHTML = `
-  <div class="brand">
-    <h1>Taktik Tahtası</h1>
-    <span class="sub">3-2-3</span>
-  </div>
-`;
+topbar.innerHTML = `<div class="brand"><h1>Taktik Tahtası</h1><span class="sub">motor testi</span></div>`;
 app.appendChild(topbar);
 
-// --- Saha ---
 const pitchWrap = document.createElement('div');
 pitchWrap.className = 'pitch-wrap';
 app.appendChild(pitchWrap);
 
-const svg = el('svg', {
-  viewBox: `0 0 ${DESIGN.width} ${DESIGN.height}`,
-  preserveAspectRatio: 'xMidYMid meet',
-}) as SVGSVGElement;
-pitchWrap.appendChild(svg);
+const stage = new Stage(pitchWrap);
 
-// Katman sırası (alttan üste): saha → bölge → oklar → oyuncular → top → halka
-drawPitch(svg);
-group('zones-layer', svg);
-group('arrows-layer', svg);
-const playersLayer = group('players-layer', svg);
-const ballLayer = group('ball-layer', svg);
-group('ring-layer', svg);
+const test: CompiledScenario = {
+  id: 'test',
+  title: 'Motor Testi',
+  group: 'hucum',
+  duration: 3000,
+  formation: {
+    id: 'F',
+    name: 'F',
+    positions: {
+      u8: { x: 0.2, y: 0.6 },
+      u9: { x: 0.5, y: 0.3 },
+      r9: { x: 0.5, y: 0.7 },
+      u5: { x: 0.5, y: 0.82 },
+      uK: { x: 0.5, y: 0.95 },
+    },
+  },
+  players: [],
+  tracks: [
+    {
+      id: 'u8',
+      keyframes: [
+        { t: 0, pos: { x: 0.2, y: 0.6 } },
+        { t: 1500, pos: { x: 0.8, y: 0.4 }, ease: 'smooth' },
+        { t: 3000, pos: { x: 0.2, y: 0.6 }, ease: 'smooth' },
+      ],
+    },
+  ],
+  behaviors: {
+    u5: [{ kind: 'shadowMark', targetId: 'r9', offset: { x: 0, y: 0.05 } }],
+    r9: [{ kind: 'idleSway', amp: 0.006 }],
+  },
+  ball: [{ kind: 'carried', t0: 0, t1: 3000, carrierId: 'u8' }],
+  annotations: [
+    { kind: 'ring', t0: 500, t1: 2500, playerId: 'u8' },
+    { kind: 'zone', t0: 800, t1: 2600, center: { x: 0.7, y: 0.4 }, rx: 0.12, ry: 0.08, label: 'test bölge' },
+  ],
+  phases: [
+    { id: 'a', title: 'Git', note: 'A→B', t0: 0, t1: 1500 },
+    { id: 'b', title: 'Dön', note: 'B→A', t0: 1500, t1: 3000 },
+  ],
+};
 
-const entities = createEntities(playersLayer, ballLayer, ALL_PLAYERS);
+stage.load(test);
 
-// Statik yerleşim
-for (const [id, node] of Object.entries(entities.players)) {
-  const pos = F323.positions[id];
-  if (pos) placePlayer(node, pos);
-}
+// Dev kontrol barı
+const dev = document.createElement('div');
+dev.className = 'dev-bar';
+dev.innerHTML = `
+  <div class="control-row">
+    <button class="ctrl primary" id="play">▶</button>
+    <button class="ctrl" id="restart">⟲</button>
+    <input type="range" id="scrub" min="0" max="3000" value="0" style="flex:1" />
+    <span class="time-read" id="tread">0.00s</span>
+  </div>
+`;
+app.appendChild(dev);
 
-// Topu geçici olarak kaleci önüne koy
-entities.ballCore.parentElement?.setAttribute('transform', 'translate(0 0)');
-const gkPos = F323.positions.uK;
-entities.ballG.setAttribute(
-  'transform',
-  `translate(${(DESIGN.margin + gkPos.x * (DESIGN.width - 2 * DESIGN.margin)).toFixed(1)} ${(
-    DESIGN.margin +
-    (gkPos.y - 0.03) * (DESIGN.height - 2 * DESIGN.margin)
-  ).toFixed(1)})`,
-);
+const playBtn = dev.querySelector<HTMLButtonElement>('#play')!;
+const scrub = dev.querySelector<HTMLInputElement>('#scrub')!;
+const tread = dev.querySelector<HTMLSpanElement>('#tread')!;
 
-console.log('Faz 0: saha + 17 oyuncu render edildi.');
+playBtn.onclick = () => stage.clock.toggle();
+dev.querySelector<HTMLButtonElement>('#restart')!.onclick = () => stage.clock.restart();
+scrub.oninput = () => {
+  stage.clock.pause();
+  stage.clock.seek(Number(scrub.value));
+};
+
+stage.clock.onStateChange = (s) => {
+  playBtn.textContent = s.playing ? '⏸' : '▶';
+};
+stage.onRender = (frame) => {
+  scrub.value = String(Math.round(frame.t));
+  tread.textContent = (frame.t / 1000).toFixed(2) + 's';
+};
+
+console.log('Faz 1: motor + scrubber hazır.');

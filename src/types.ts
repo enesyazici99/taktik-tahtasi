@@ -82,7 +82,7 @@ export interface CompiledScenario {
 export interface FrameState {
   t: number;
   entities: Record<string, Vec & { facing: number }>;
-  ball: { pos: Vec; radius: number; shadow: number; trail: Vec[] };
+  ball: { pos: Vec; radius: number; shadow: number; trail: Vec[]; carried: boolean };
   activeAnnotations: ResolvedAnnotation[];
   phaseIndex: number;
 }
