@@ -51,10 +51,15 @@ app.appendChild(controls.el);
 let currentScenario: CompiledScenario = firstScenario();
 let loadedId = ''; // hash-route geri besleme döngüsünü kır
 
+// --- Araçlar (v2) — narration önce kurulmalı (onRender kullanır) ---
+const tools = mountTools(toolsBtn, stage, () => currentScenario, (sc) => selectScenario(sc, false));
+
 // --- Bağlantılar ---
-stage.onRender = (frame) => {
+stage.onRender = (frame, sc) => {
   phasePanel.setActive(frame.phaseIndex);
   controls.update(frame.t);
+  const ph = sc.phases[frame.phaseIndex];
+  if (ph) tools.narration.speak(`${ph.title}. ${ph.note}`, sc.id + ':' + frame.phaseIndex);
 };
 stage.clock.onStateChange = (s) => controls.setPlaying(s.playing);
 
@@ -68,9 +73,6 @@ function selectScenario(sc: CompiledScenario, updateHash: boolean): void {
   if (updateHash) location.hash = `/senaryo/${sc.id}`;
   if (!reduced) stage.clock.play();
 }
-
-// --- Araçlar (v2: editör, export, varyant, ses, analiz) ---
-mountTools(toolsBtn, stage, () => currentScenario, (sc) => selectScenario(sc, true));
 
 // --- Hash router ---
 // #/senaryo/<id>            → senaryoyu aç (otomatik oynat)

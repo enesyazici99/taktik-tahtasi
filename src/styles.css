@@ -362,6 +362,123 @@ button {
   color: var(--chalk-dim);
 }
 
+/* --- v2 araçlar menüsü --- */
+.tools-menu {
+  position: fixed;
+  z-index: 40;
+  min-width: 220px;
+  padding: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tools-item {
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--chalk);
+}
+.tools-item:active,
+.tools-item:hover {
+  background: var(--panel);
+}
+.tools-sub {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 2px 0;
+}
+.tools-label {
+  display: block;
+  font-size: 12px;
+  color: var(--chalk-dim);
+  margin-bottom: 6px;
+}
+.tools-chip {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 5px 9px;
+  margin: 0 4px 4px 0;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--chalk);
+}
+.tools-chip:active {
+  border-color: var(--accent);
+}
+
+/* --- Editör / analiz barı (kontrollerin yerine) --- */
+.editor-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 30;
+  padding: 8px 12px calc(10px + var(--safe-b));
+  background: linear-gradient(180deg, rgba(16, 22, 20, 0.5), var(--bg) 45%);
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--line);
+}
+.editor-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.editor-row:first-child {
+  margin-top: 0;
+}
+.editor-frame {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  min-width: 74px;
+  text-align: center;
+}
+.editor-hint {
+  font-size: 11.5px;
+  color: var(--chalk-dim);
+  line-height: 1.4;
+}
+
+/* --- İlerleme overlay (video export) --- */
+.progress-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(16, 22, 20, 0.7);
+  backdrop-filter: blur(3px);
+}
+.progress-box {
+  width: min(80%, 320px);
+  padding: 18px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.progress-label {
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+.progress-track {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     scroll-behavior: auto !important;

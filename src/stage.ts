@@ -6,7 +6,7 @@ import { AnnotationRenderer } from './render/annotations';
 import { createEntities, placePlayer, type EntityLayer } from './render/entities';
 import { drawPitch, toPx } from './render/pitch';
 import { el, group } from './render/svg';
-import type { CompiledScenario, FrameState } from './types';
+import type { CompiledScenario, FrameState, ResolvedAnnotation, Vec } from './types';
 
 // ============================================================================
 // Stage: SVG + katmanlar + entity havuzu + anotasyon render + clock. render(t)
@@ -73,6 +73,55 @@ export class Stage {
     this.annotations.update(frame.activeAnnotations);
 
     this.onRender(frame, sc);
+  }
+
+  // --- v2 (editör / analiz) yardımcıları ---
+
+  /** Ekran koordinatını normalize (0..1) sahaya çevirir. */
+  screenToNorm(clientX: number, clientY: number): Vec {
+    const ctm = this.svg.getScreenCTM();
+    const pt = this.svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const d = ctm ? pt.matrixTransform(ctm.inverse()) : pt;
+    const { width, height, margin } = { width: 680, height: 1000, margin: 40 };
+    return {
+      x: (d.x - margin) / (width - 2 * margin),
+      y: (d.y - margin) / (height - 2 * margin),
+    };
+  }
+
+  /** Bir oyuncuyu statik olarak yerleştir (editör/analiz). */
+  placeById(id: string, pos: Vec): void {
+    const node = this.entities.players[id];
+    if (node) placePlayer(node, pos);
+  }
+
+  setVisible(id: string, visible: boolean): void {
+    const node = this.entities.players[id];
+    if (node) node.g.style.display = visible ? '' : 'none';
+  }
+
+  hideBall(): void {
+    this.entities.ballG.setAttribute('opacity', '0');
+    this.entities.ballShadow.setAttribute('opacity', '0');
+    for (const t of this.entities.trail) t.setAttribute('opacity', '0');
+  }
+  showBall(): void {
+    this.entities.ballG.setAttribute('opacity', '1');
+    this.entities.ballShadow.setAttribute('opacity', '1');
+  }
+
+  /** Statik anotasyon çiz (analiz modu bölge/etiketleri). */
+  drawStaticAnnotations(anns: ResolvedAnnotation[]): void {
+    this.annotations.update(anns);
+  }
+
+  get playerIds(): string[] {
+    return Object.keys(this.entities.players);
+  }
+  playerNode(id: string): SVGGElement | undefined {
+    return this.entities.players[id]?.g;
   }
 
   private applyBall(frame: FrameState): void {
