@@ -158,7 +158,10 @@ button {
 .pitch-wrap svg {
   width: 100%;
   height: auto;
+  /* Kısa ekranlarda saha kontrolleri ittirmesin: yüksekliği sınırla */
+  max-height: 56vh;
   display: block;
+  margin: 0 auto;
   border-radius: var(--radius);
   overflow: hidden;
 }
@@ -173,7 +176,7 @@ button {
   gap: 6px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding: 12px 12px 6px;
+  padding: 8px 12px 4px;
 }
 .phase-strip::-webkit-scrollbar {
   display: none;
@@ -211,7 +214,7 @@ button {
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
   border-radius: 10px;
-  min-height: 62px;
+  min-height: 54px;
   position: relative;
 }
 .note-card .note-title {

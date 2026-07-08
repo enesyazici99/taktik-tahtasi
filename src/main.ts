@@ -49,6 +49,7 @@ const controls = createControls(stage.clock);
 app.appendChild(controls.el);
 
 let currentScenario: CompiledScenario = firstScenario();
+let loadedId = ''; // hash-route geri besleme döngüsünü kır
 
 // --- Bağlantılar ---
 stage.onRender = (frame) => {
@@ -59,6 +60,7 @@ stage.clock.onStateChange = (s) => controls.setPlaying(s.playing);
 
 function selectScenario(sc: CompiledScenario, updateHash: boolean): void {
   currentScenario = sc;
+  loadedId = sc.id;
   stage.load(sc);
   phasePanel.setScenario(sc);
   controls.setScenario(sc);
@@ -71,13 +73,16 @@ function selectScenario(sc: CompiledScenario, updateHash: boolean): void {
 mountTools(toolsBtn, stage, () => currentScenario, (sc) => selectScenario(sc, true));
 
 // --- Hash router ---
+// #/senaryo/<id>            → senaryoyu aç (otomatik oynat)
+// #/senaryo/<id>&t=2000     → o ana atla ve duraklat (an paylaşımı)
 function routeFromHash(): void {
   const m = location.hash.match(/senaryo\/([\w-]+)/);
-  if (m && SCENARIO_BY_ID[m[1]]) {
-    scenarioList.select(m[1]);
-  } else {
-    selectScenario(firstScenario(), true);
-    scenarioList.select(firstScenario().id);
+  const tMatch = location.hash.match(/[&?]t=(\d+)/);
+  const id = m && SCENARIO_BY_ID[m[1]] ? m[1] : firstScenario().id;
+  if (id !== loadedId) scenarioList.select(id); // yüklü senaryoyu tekrar yükleme
+  if (tMatch) {
+    stage.clock.pause();
+    stage.clock.seek(Number(tMatch[1]));
   }
 }
 window.addEventListener('hashchange', routeFromHash);
@@ -112,9 +117,6 @@ function seekPhase(dir: number): void {
   stage.clock.seek(phases[next].t0);
 }
 
-// Başlat
+// Başlat. reduced-motion'da otomatik oynatma yok (selectScenario zaten
+// yalnızca !reduced iken play() çağırır; stage.load t=0'a alır).
 routeFromHash();
-
-if (reduced) {
-  stage.clock.seek(0);
-}
